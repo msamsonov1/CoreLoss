@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoreLoss | Planetary Inverter High-Frequency Inductor Core Hysteresis Sentry</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        space: {
+                            950: '#03050a',
+                            900: '#05070d',
+                            850: '#080c14',
+                            800: '#0f172a',
+                            700: '#1e293b'
+                        },
+                        cyan: {
+                            300: '#67e8f9',
+                            400: '#22d3ee',
+                            500: '#06b6d4'
+                        },
+                        violet: {
+                            400: '#a78bfa',
+                            500: '#8b5cf6'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Inter and JetBrains Mono Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- MathJax v3 Bulletproof Configuration -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        body {
+            background-color: #03050a;
+            color: #f1f5f9;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+        .mono-val {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .formula-box {
+            background: #030712;
+            padding: 0.85rem;
+            border-radius: 0.5rem;
+            border: 1px solid #1f2937;
+            text-align: center;
+            color: #67e8f9;
+            font-size: 0.875rem;
+            overflow-x: auto;
+            margin: 0.5rem 0;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #080c14;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #06b6d4;
+        }
+        .canvas-grid {
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-cyan-500 selection:text-black">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-gray-800 bg-space-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                    <i data-lucide="activity-square" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-lg tracking-wider text-white">CORELOSS</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 mono-val">TRL-4 / NASA STTR</span>
+                    </div>
+                    <p class="text-xs text-gray-400 hidden sm:block">Planetary Inverter High-Frequency Inductor Core Hysteresis Sentry</p>
+                </div>
+            </div>
+
+            <!-- Global Status Telemetry Pill -->
+            <div class="hidden md:flex items-center space-x-6 text-xs mono-val">
+                <div class="flex items-center space-x-2">
+                    <span class="text-gray-400">CORE DISSIPATION:</span>
+                    <span id="navCoreDiss" class="text-emerald-400 font-semibold">14.2 mJ/cyc</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-gray-400">INVERTER TOPOLOGY:</span>
+                    <span id="navTopology" class="text-cyan-400 font-semibold uppercase">Hard PWM (350 kHz)</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="text-gray-400">SEP FLUX:</span>
+                    <span id="navSepFlux" class="text-gray-300">0.0 MeV·cm⁻²</span>
+                </div>
+            </div>
+
+            <!-- Tab Buttons -->
+            <nav class="flex space-x-1 sm:space-x-2">
+                <button id="tabBtnSim" onclick="switchTab('sim')" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                    Simulation HUD
+                </button>
+                <button id="tabBtnPhysics" onclick="switchTab('physics')" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 border border-transparent">
+                    Core Physics
+                </button>
+                <button id="tabBtnProposal" onclick="switchTab('proposal')" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 border border-transparent">
+                    NASA Proposal
+                </button>
+                <button id="tabBtnARR" onclick="switchTab('arr')" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 border border-transparent">
+                    Commercial ARR
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: SIMULATION & TELEMETRY HUD (#viewSim) -->
+        <!-- ========================================== -->
+        <section id="viewSim" class="space-y-6">
+            <!-- Alert / Status Banner -->
+            <div id="statusBanner" class="p-3.5 rounded-xl bg-gray-900/60 border border-gray-800 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center space-x-3">
+                    <div id="statusIconHolder" class="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <i data-lucide="shield-check" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span id="statusTitle" class="text-sm font-semibold text-gray-100">Nanocrystalline Core Operating Within Radiation-Hardened Margin</span>
+                            <span id="mitigationBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 mono-val font-semibold uppercase">NOMINAL (PWM)</span>
+                        </div>
+                        <p id="statusDesc" class="text-xs text-gray-400">Dynamic $B\text{-}\Phi$ hysteresis loop area is baseline. No thermal runaway detected.</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button onclick="triggerSEPBump()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 flex items-center space-x-1.5 transition-all">
+                        <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                        <span>Inject Extreme SEP Event</span>
+                    </button>
+                    <button onclick="resetDefaults()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700 flex items-center space-x-1.5 transition-all">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        <span>Reset Baseline</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Top Grid: Hardware Canvas & Primary Phase-Space Scatter -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Physical Inductor & Domain Simulation Canvas -->
+                <div class="lg:col-span-5 bg-space-900/60 border border-gray-800 rounded-xl p-4 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-2">
+                            <i data-lucide="cpu" class="w-4 h-4 text-cyan-400"></i>
+                            <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider">Nanocrystalline Toroid & Winding Dynamics</span>
+                        </div>
+                        <span id="toroidTemp" class="text-xs mono-val text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">Core: 48.2 °C</span>
+                    </div>
+                    
+                    <div class="relative w-full aspect-[4/3] bg-space-950 rounded-lg border border-gray-800 overflow-hidden canvas-grid">
+                        <canvas id="inductorCanvas" class="w-full h-full block"></canvas>
+                        <!-- Canvas overlay labels -->
+                        <div class="absolute bottom-2 left-2 pointer-events-none text-[10px] mono-val text-gray-400 bg-black/70 px-2 py-1 rounded border border-gray-800">
+                            Sensor Pickoff: <span id="vSenseDisplay" class="text-cyan-400">4.12 V pk-pk</span> | $\oint B\,d\Phi$
+                        </div>
+                        <div class="absolute top-2 right-2 pointer-events-none text-[10px] mono-val text-gray-400 bg-black/70 px-2 py-1 rounded border border-gray-800 flex items-center space-x-1">
+                            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                            <span id="canvasModePill" class="text-cyan-300">PWM 350 kHz</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-gray-800 text-center mono-val text-xs">
+                        <div class="bg-space-950 p-2 rounded border border-gray-800/80">
+                            <div class="text-[10px] text-gray-400">Domain Coercivity $H_c$</div>
+                            <div id="valHc" class="font-bold text-gray-200 mt-0.5">1.25 A/m</div>
+                        </div>
+                        <div class="bg-space-950 p-2 rounded border border-gray-800/80">
+                            <div class="text-[10px] text-gray-400">Sat. Flux $B_{\text{sat}}$</div>
+                            <div id="valBsat" class="font-bold text-gray-200 mt-0.5">1.28 T</div>
+                        </div>
+                        <div class="bg-space-950 p-2 rounded border border-gray-800/80">
+                            <div class="text-[10px] text-gray-400">Switching Mode</div>
+                            <div id="valMode" class="font-bold text-cyan-400 mt-0.5">HARD PWM</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Primary Diagnostic Phase Space: B vs Phi Dynamic Loop -->
+                <div class="lg:col-span-7 bg-space-900/60 border border-gray-800 rounded-xl p-4 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <i data-lucide="orbit" class="w-4 h-4 text-cyan-400"></i>
+                                <span class="text-xs font-semibold text-gray-200 uppercase tracking-wider">Dynamic Hysteresis Phase Space ($B$ vs $\Phi$)</span>
+                            </div>
+                            <p class="text-[11px] text-gray-400">Enclosed Loop Area $\oint B\,d\Phi$ equals instantaneous core loss per cycle ($E_{\text{diss}}$)</p>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs mono-val">
+                            <span class="text-gray-400">Loop Area:</span>
+                            <span id="loopAreaVal" class="text-cyan-300 font-bold px-2 py-0.5 bg-cyan-950 rounded border border-cyan-800">14.22 mJ</span>
+                        </div>
+                    </div>
+
+                    <div class="relative w-full h-[280px]">
+                        <canvas id="phaseChart"></canvas>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[11px] text-gray-400 border-t border-gray-800/80 pt-2 mt-2">
+                        <div class="flex items-center space-x-4">
+                            <span class="flex items-center space-x-1.5"><span class="w-3 h-0.5 bg-emerald-400 inline-block"></span><span>Nominal Safe Corridor</span></span>
+                            <span class="flex items-center space-x-1.5"><span class="w-3 h-0.5 bg-rose-500 inline-block border-t border-dashed"></span><span>Runaway Threshold Limit</span></span>
+                            <span class="flex items-center space-x-1.5"><span class="w-2 h-2 rounded-full bg-cyan-400 inline-block"></span><span>Real-time Sentry Trajectory</span></span>
+                        </div>
+                        <span class="mono-val text-cyan-400">Sentry Sampling: 20 MSPS</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Grid: Secondary Time-Series & Closed-Loop Controls -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Secondary Chart 1: Core Dissipation vs Runaway Boundary -->
+                <div class="lg:col-span-4 bg-space-900/60 border border-gray-800 rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center space-x-1.5">
+                            <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-400"></i>
+                            <span>Cycle Dissipation ($E_{\text{diss}}$)</span>
+                        </span>
+                        <span id="chart1Val" class="text-xs mono-val text-gray-300">14.2 mJ</span>
+                    </div>
+                    <div class="h-44">
+                        <canvas id="dissipationChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Secondary Chart 2: Controller Switching Frequency Response -->
+                <div class="lg:col-span-4 bg-space-900/60 border border-gray-800 rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center space-x-1.5">
+                            <i data-lucide="radio" class="w-3.5 h-3.5 text-cyan-400"></i>
+                            <span>Inverter Frequency Modulation ($f_{\text{sw}}$)</span>
+                        </span>
+                        <span id="chart2Val" class="text-xs mono-val text-cyan-300">350 kHz</span>
+                    </div>
+                    <div class="h-44">
+                        <canvas id="frequencyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Closed-Loop Interactive Control Station -->
+                <div class="lg:col-span-4 bg-space-900/60 border border-gray-800 rounded-xl p-4 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-semibold text-gray-200 uppercase tracking-wider flex items-center space-x-1.5">
+                            <i data-lucide="sliders" class="w-3.5 h-3.5 text-violet-400"></i>
+                            <span>Closed-Loop Sentry Controls</span>
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded bg-violet-950 text-violet-300 border border-violet-800 mono-val">Autonomous Observer</span>
+                    </div>
+                    
+                    <div class="space-y-3 my-auto">
+                        <!-- Slider 1: Solar Energetic Particle (SEP) Proton / Heavy Ion Flux -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-gray-400">SEP Radiation Flux ($\Phi_{\text{SEP}}$):</span>
+                                <span id="labelSepFlux" class="mono-val text-rose-400 font-semibold">0.0 MeV·cm⁻²</span>
+                            </div>
+                            <input id="sliderSep" type="range" min="0" max="100" value="0" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-rose-500">
+                        </div>
+
+                        <!-- Slider 2: Ambient Toroid Core Heat Sink Temp -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-gray-400">Heat Sink Cold-Plate Temp ($T_{\text{ambient}}$):</span>
+                                <span id="labelAmbientTemp" class="mono-val text-amber-400 font-semibold">25 °C</span>
+                            </div>
+                            <input id="sliderTemp" type="range" min="-40" max="140" value="25" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                        </div>
+
+                        <!-- Toggle 1: Autonomous Hysteresis Sentry Protection Active -->
+                        <div class="flex items-center justify-between pt-2 border-t border-gray-800">
+                            <div>
+                                <span class="text-xs text-gray-200 font-medium block">Autonomous Fallback Control</span>
+                                <span class="text-[10px] text-gray-500">Throttle frequency & switch to Quasi-Resonant mode</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input id="toggleAutonomous" type="checkbox" checked class="sr-only peer">
+                                <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="p-2 rounded bg-space-950 border border-gray-800/80 text-[11px] text-gray-400 mono-val flex items-center justify-between">
+                        <span>Autonomous Action:</span>
+                        <span id="autoActionStatus" class="text-emerald-400 font-semibold">STANDBY (SAFE MARGIN)</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: CORE PHYSICS & MATHEMATICAL MODEL (#viewPhysics) -->
+        <!-- ========================================== -->
+        <section id="viewPhysics" class="hidden space-y-6">
+            <div class="border-b border-gray-800 pb-4">
+                <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                    <i data-lucide="book-open" class="w-5 h-5 text-cyan-400"></i>
+                    <span>Core Physics & Dynamic Hysteresis State Observer</span>
+                </h2>
+                <p class="text-sm text-gray-400 mt-1">
+                    Nanocrystalline magnetic alloy degradation kinetics under displacement damage dose (DDD) from Solar Energetic Particle (SEP) showers.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Physics Card 1 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-5">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-7 h-7 rounded bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-xs mono-val">
+                            01
+                        </div>
+                        <h3 class="text-sm font-bold text-gray-200 uppercase tracking-wider">Hysteresis Energy Dissipation & Loop Integration</h3>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed">
+                        In high-frequency power magnetic toroids (e.g., Nanoperm, FINEMET $\text{Fe}_{73.5}\text{Si}_{13.5}\text{B}_9\text{Nb}_3\text{Cu}_1$), the magnetic energy dissipated as heat per switching period $T_{\text{sw}}$ is the line integral of magnetic field strength $H$ over flux density $B$, directly converted to digital telemetry via integrated terminal flux linkage $\Phi$:
+                    </p>
+                    <div class="formula-box">
+                        $$E_{\text{diss}} = V_c \oint H\,dB = \frac{V_c}{N_{\text{sec}}} \oint B(t)\, d\Phi(t)$$
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed mt-2">
+                        Here $V_c$ is effective magnetic core volume and $N_{\text{sec}}$ is the number of turns on the sentry pickoff winding. Total high-frequency core loss per unit volume incorporates the modified Steinmetz expansion:
+                    </p>
+                    <div class="formula-box">
+                        $$P_v = C_{\text{SE}} f_{\text{sw}}^\alpha \Delta B^\beta \cdot \left[1 + \gamma_{\text{rad}}(T) \cdot \Phi_{\text{SEP}}\right]$$
+                    </div>
+                </div>
+
+                <!-- Physics Card 2 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-5">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-7 h-7 rounded bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-xs mono-val">
+                            02
+                        </div>
+                        <h3 class="text-sm font-bold text-gray-200 uppercase tracking-wider">Microscopic Radiation-Induced Domain Pinning</h3>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed">
+                        Solar Energetic Particle (SEP) events unleash relativistic protons ($E_p > 10\text{ MeV}$) and iron heavy ions ($^{56}\text{Fe}$). Primary knock-on atoms (PKA) generate vacancy clusters and dislocation loops across the 10 nm amorphous grain boundaries, creating microscopic magnetic pinning sites:
+                    </p>
+                    <div class="formula-box">
+                        $$H_c(\Phi_{\text{SEP}}) = H_{c0} + \Delta H_c = H_{c0} + \kappa_{\text{pinning}} \frac{\sqrt{N_d \cdot r_d}}{\mu_0 M_s}$$
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed mt-2">
+                        Where $N_d$ is radiation defect cascade density and $M_s$ is spontaneous saturation magnetization. Pinning widens coercivity $H_c$, ballooning the phase loop and multiplying losses by up to $340\%$.
+                    </p>
+                </div>
+
+                <!-- Physics Card 3 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-5">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-7 h-7 rounded bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-xs mono-val">
+                            03
+                        </div>
+                        <h3 class="text-sm font-bold text-gray-200 uppercase tracking-wider">Thermal Runaway Positive Feedback Loop</h3>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed">
+                        Nanocrystalline materials exhibit a sharp Curie temperature $T_c \approx 570^\circ\text{C}$, but effective saturation flux density $B_{\text{sat}}(T)$ degrades precipitously beyond $120^\circ\text{C}$ according to the Bloch $T^{3/2}$ law:
+                    </p>
+                    <div class="formula-box">
+                        $$B_{\text{sat}}(T) = B_{\text{sat}}(0) \left[1 - s \left(\frac{T}{T_c}\right)^{3/2}\right]$$
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed mt-2">
+                        When radiation increases $E_{\text{diss}}$, core heat generation outstrips spacecraft radiator dissipation. $B_{\text{sat}}$ collapses into the operating flux swing $\Delta B$, driving inductor permeability to vacuum levels $\mu_0$, causing catastrophic current spikes that destroy primary GaN/SiC FETs.
+                    </p>
+                </div>
+
+                <!-- Physics Card 4 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-5">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-7 h-7 rounded bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-xs mono-val">
+                            04
+                        </div>
+                        <h3 class="text-sm font-bold text-gray-200 uppercase tracking-wider">Real-Time Inversion & Autonomous Mode Adaptation</h3>
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed">
+                        The CoreLoss embedded sentry samples pickoff coil voltage $v_s(t) = -N_s \frac{d\Phi}{dt}$ at 20 MSPS. A dedicated DSP executes trapezoidal discrete contour integration every switching cycle:
+                    </p>
+                    <div class="formula-box">
+                        $$\mathcal{A}_k = \sum_{n=1}^{M} \frac{B_n + B_{n-1}}{2} \cdot (\Phi_n - \Phi_{n-1})$$
+                    </div>
+                    <p class="text-xs text-gray-400 leading-relaxed mt-2">
+                        If $\mathcal{A}_k > \mathcal{A}_{\text{threshold}}$, the FPGA issues instantaneous modulation commands: throttling switching frequency $f_{\text{sw}}$ ($350\text{ kHz} \to 120\text{ kHz}$) and transitioning gate drives to Zero-Voltage-Switching (ZVS) Quasi-Resonant mode.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: NASA SBIR/STTR PROPOSAL (#viewProposal) -->
+        <!-- ========================================== -->
+        <section id="viewProposal" class="hidden space-y-6">
+            <div class="border-b border-gray-800 pb-4 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                        <i data-lucide="award" class="w-5 h-5 text-cyan-400"></i>
+                        <span>NASA STTR Phase I: Ultra-Lightweight Power Magnetics</span>
+                    </h2>
+                    <p class="text-sm text-gray-400 mt-1">
+                        Solicitation Topic: Spacecraft High-Power Density Inverters & Planetary Power Distribution (Z2.01)
+                    </p>
+                </div>
+                <div class="flex items-center space-x-3 text-xs mono-val">
+                    <div class="bg-cyan-950/60 border border-cyan-800/80 px-3 py-1.5 rounded-lg text-cyan-300">
+                        Total Budget: <span class="font-bold text-white">$225,000</span>
+                    </div>
+                    <div class="bg-violet-950/60 border border-violet-800/80 px-3 py-1.5 rounded-lg text-violet-300">
+                        Period of Performance: <span class="font-bold text-white">6 Months</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- University Subcontract Allocation Breakdown -->
+            <div class="bg-space-900/60 border border-gray-800 rounded-xl p-5">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-200 uppercase tracking-wider flex items-center space-x-2">
+                            <i data-lucide="graduation-cap" class="w-4 h-4 text-cyan-400"></i>
+                            <span>Mandatory STTR Research Institution Partner (30.0% Subcontract)</span>
+                        </h3>
+                        <p class="text-xs text-gray-400 mt-0.5">Subcontract Lead: University of Central Florida (UCF) Center for Advanced Turbomachinery and Energy Research (CATER)</p>
+                    </div>
+                    <span class="text-xs mono-val px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold">
+                        Allocation: $67,500.00 USD (30.00%)
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div class="bg-space-950 p-3.5 rounded-lg border border-gray-800">
+                        <span class="text-gray-400 block mb-1">Key Personnel</span>
+                        <span class="font-semibold text-gray-200">Prof. Subhashish Bhattacharya / Dr. Erik Vandeventer</span>
+                        <p class="text-gray-500 text-[11px] mt-1">Lead PI on Wide Bandgap Magnetic Characterization & Radiation Chamber testing.</p>
+                    </div>
+                    <div class="bg-space-950 p-3.5 rounded-lg border border-gray-800">
+                        <span class="text-gray-400 block mb-1">Testing Facilities</span>
+                        <span class="font-semibold text-gray-200">UCF CATER Vacuum Chambers & Proton Beamline</span>
+                        <p class="text-gray-500 text-[11px] mt-1">10 MeV to 60 MeV tunable proton beam testing under cryo-to-high vacuum ($10^{-6}\text{ Torr}$).</p>
+                    </div>
+                    <div class="bg-space-950 p-3.5 rounded-lg border border-gray-800">
+                        <span class="text-gray-400 block mb-1">STTR Compliance</span>
+                        <span class="font-semibold text-emerald-400">Strict STTR Policy Directive Check: Passed</span>
+                        <p class="text-gray-500 text-[11px] mt-1">SBC performs 70.0% ($157,500), RI partner performs exactly 30.0% ($67,500).</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Milestone Schedule Months 1-6 -->
+            <div class="bg-space-900/60 border border-gray-800 rounded-xl p-5">
+                <h3 class="text-sm font-bold text-gray-200 uppercase tracking-wider mb-4 flex items-center space-x-2">
+                    <i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i>
+                    <span>Phase I Work Breakdown Schedule (Months 1–6)</span>
+                </h3>
+
+                <div class="space-y-3">
+                    <!-- Milestone 1 -->
+                    <div class="p-3.5 rounded-lg bg-space-950 border border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div class="flex items-start space-x-3">
+                            <span class="mono-val text-xs text-cyan-400 font-bold bg-cyan-950 px-2 py-1 rounded border border-cyan-800">M1–M2</span>
+                            <div>
+                                <span class="text-xs font-semibold text-gray-200">Kinetic Displacement Modeling & Radiation In Situ Testing</span>
+                                <p class="text-[11px] text-gray-400">Expose Nanoperm / FINEMET cores to UCF proton accelerator; map coercivity expansion $\Delta H_c$ vs. fluence.</p>
+                            </div>
+                        </div>
+                        <span class="text-[11px] mono-val text-gray-400 bg-gray-900 px-2.5 py-1 rounded border border-gray-800">$48,000</span>
+                    </div>
+
+                    <!-- Milestone 2 -->
+                    <div class="p-3.5 rounded-lg bg-space-950 border border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div class="flex items-start space-x-3">
+                            <span class="mono-val text-xs text-cyan-400 font-bold bg-cyan-950 px-2 py-1 rounded border border-cyan-800">M3–M4</span>
+                            <div>
+                                <span class="text-xs font-semibold text-gray-200">FPGA Discrete Contour State Observer Algorithm</span>
+                                <p class="text-[11px] text-gray-400">Implement real-time 20 MSPS trapezoidal discrete contour integration $\oint B\,d\Phi$ on rad-hard Microchip PolarFire FPGA.</p>
+                            </div>
+                        </div>
+                        <span class="text-[11px] mono-val text-gray-400 bg-gray-900 px-2.5 py-1 rounded border border-gray-800">$59,500</span>
+                    </div>
+
+                    <!-- Milestone 3 -->
+                    <div class="p-3.5 rounded-lg bg-space-950 border border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div class="flex items-start space-x-3">
+                            <span class="mono-val text-xs text-cyan-400 font-bold bg-cyan-950 px-2 py-1 rounded border border-cyan-800">M5</span>
+                            <div>
+                                <span class="text-xs font-semibold text-gray-200">Autonomous GaN Inverter Closed-Loop Fallback Integration</span>
+                                <p class="text-[11px] text-gray-400">Benchmark sub-microsecond frequency throttling and soft-resonant transition under sudden core saturation events.</p>
+                            </div>
+                        </div>
+                        <span class="text-[11px] mono-val text-gray-400 bg-gray-900 px-2.5 py-1 rounded border border-gray-800">$62,000</span>
+                    </div>
+
+                    <!-- Milestone 4 -->
+                    <div class="p-3.5 rounded-lg bg-space-950 border border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div class="flex items-start space-x-3">
+                            <span class="mono-val text-xs text-cyan-400 font-bold bg-cyan-950 px-2 py-1 rounded border border-cyan-800">M6</span>
+                            <div>
+                                <span class="text-xs font-semibold text-gray-200">Phase II Hardware Specification & TRL-5 Flight Test Plan</span>
+                                <p class="text-[11px] text-gray-400">Final engineering report and commercialization roadmap for Artemis Lunar Surface Power Grid and VIPER rovers.</p>
+                            </div>
+                        </div>
+                        <span class="text-[11px] mono-val text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded border border-emerald-800">$55,500</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phase II Transition Plan -->
+            <div class="bg-gradient-to-r from-space-900/80 to-space-850/80 border border-cyan-500/30 rounded-xl p-5">
+                <div class="flex items-center space-x-3 mb-2">
+                    <i data-lucide="rocket" class="w-5 h-5 text-cyan-400"></i>
+                    <h3 class="text-sm font-bold text-gray-100 uppercase tracking-wider">Phase II Direct Flight Transition Pathway ($1,100,000 Target)</h3>
+                </div>
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    Upon completion of Phase I TRL-4 demonstration, the Phase II program will fabricate flight-ready 10 kW space-grade buck/boost inverters integrated into the NASA Glenn Vertical Solar Array Technology (VSAT) architecture and Lunar Terrain Vehicle (LTV) powertrain. Testing will take place at NASA Glenn's Space Power Facility (SPF) thermal-vacuum chamber.
+                </p>
+            </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: COMMERCIAL & NATIONWIDE ARR (#viewARR) -->
+        <!-- ========================================== -->
+        <section id="viewARR" class="hidden space-y-6">
+            <!-- ARR Hero Metric Header -->
+            <div class="bg-space-900/60 border border-cyan-500/30 rounded-xl p-6 relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-60 h-60 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider mono-val">Civil & Industrial SaaS Revenue Expansion</span>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">
+                            $246.8M <span class="text-gray-400 text-lg font-normal">Mature Nationwide ARR</span>
+                        </h2>
+                        <p class="text-xs text-gray-400 max-w-2xl mt-1">
+                            CoreLoss firmware licenses embedded inside commercial grid, renewable, medical, and aerospace high-frequency power magnetic hardware to eradicate thermal runaway.
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs text-gray-400">Enterprise Valuation (10x SaaS Multiple)</div>
+                        <div class="text-2xl font-bold text-emerald-400 mono-val">$2.468 Billion USD</div>
+                        <span class="text-[11px] text-gray-500 mono-val">Pure Civil Software Runtime Licensing</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ARR Breakdown Table -->
+            <div class="bg-space-900/60 border border-gray-800 rounded-xl overflow-hidden">
+                <div class="p-4 border-b border-gray-800 flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-gray-200 uppercase tracking-wider flex items-center space-x-2">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400"></i>
+                        <span>Commercial Market Breakdown by Vertical</span>
+                    </h3>
+                    <span class="text-xs text-gray-400 mono-val">6 Civil Industry Verticals</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-space-950 text-gray-400 mono-val border-b border-gray-800">
+                            <tr>
+                                <th class="p-3.5">Vertical Sector</th>
+                                <th class="p-3.5">Target Application</th>
+                                <th class="p-3.5">Software Runtime Model</th>
+                                <th class="p-3.5">Asset Base</th>
+                                <th class="p-3.5 text-right">Mature Annual ARR</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800/60 text-gray-300">
+                            <tr class="hover:bg-space-850/50 transition-colors">
+                                <td class="p-3.5 font-semibold text-white flex items-center space-x-2">
+                                    <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                                    <span>Utility Solar & BESS</span>
+                                </td>
+                                <td class="p-3.5">Central 1500V String Inverters</td>
+                                <td class="p-3.5 mono-val">$185 / MW inverter / yr</td>
+                                <td class="p-3.5 mono-val">420,000 MW</td>
+                                <td class="p-3.5 mono-val text-right font-bold text-cyan-300">$77.7M</td>
+                            </tr>
+                            <tr class="hover:bg-space-850/50 transition-colors">
+                                <td class="p-3.5 font-semibold text-white flex items-center space-x-2">
+                                    <span class="w-2 h-2 rounded-full bg-violet-400"></span>
+                                    <span>Electric Vehicles (EV)</span>
+                                </td>
+                                <td class="p-3.5">800V SiC On-Board Chargers (OBC)</td>
+                                <td class="p-3.5 mono-val">$6.50 / vehicle / yr</td>
+                                <td class="p-3.5 mono-val">9,800,000 EVs</td>
+                                <td class="p-3.5 mono-val text-right font-bold text-cyan-300">$63.7M</td>
+                            </tr>
+                            <tr class="hover:bg-space-850/50 transition-colors">
+                                <td class="p-3.5 font-semibold text-white flex items-center space-x-2">
+                                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                    <span>Commercial Satellites</span>
+                                </td>
+                                <td class="p-3.5">LEO Megaconstellation Power PMAD</td>
+                                <td class="p-3.5 mono-val">$1,200 / satellite bus / yr</td>
+                                <td class="p-3.5 mono-val">34,000 birds</td>
+                                <td class="p-3.5 mono-val text-right font-bold text-cyan-300">$40.8M</td>
+                            </tr>
+                            <tr class="hover:bg-space-850/50 transition-colors">
+                                <td class="p-3.5 font-semibold text-white flex items-center space-x-2">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                    <span>Medical MRI & Proton</span>
+                                </div>
+                                <td class="p-3.5">High-Frequency Gradient Amplifiers</td>
+                                <td class="p-3.5 mono-val">$1,850 / scanner suite / yr</td>
+                                <td class="p-3.5 mono-val">18,500 scanners</td>
+                                <td class="p-3.5 mono-val text-right font-bold text-cyan-300">$34.2M</td>
+                            </tr>
+                            <tr class="hover:bg-space-850/50 transition-colors">
+                                <td class="p-3.5 font-semibold text-white flex items-center space-x-2">
+                                    <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                                    <span>AI Data Centers</span>
+                                </td>
+                                <td class="p-3.5">48V to 1V PoL Resonant Converters</td>
+                                <td class="p-3.5 mono-val">$0.45 / server blade / yr</td>
+                                <td class="p-3.5 mono-val">42,000,000 nodes</td>
+                                <td class="p-3.5 mono-val text-right font-bold text-cyan-300">$18.9M</td>
+                            </tr>
+                            <tr class="hover:bg-space-850/50 transition-colors">
+                                <td class="p-3.5 font-semibold text-white flex items-center space-x-2">
+                                    <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                                    <span>Electric Aviation (eVTOL)</span>
+                                </td>
+                                <td class="p-3.5">Megawatt Motor Inverters</td>
+                                <td class="p-3.5 mono-val">$950 / aircraft / yr</td>
+                                <td class="p-3.5 mono-val">12,100 aircraft</td>
+                                <td class="p-3.5 mono-val text-right font-bold text-cyan-300">$11.5M</td>
+                            </tr>
+                        </tbody>
+                        <tfoot class="bg-space-950/90 font-bold text-white border-t border-gray-700">
+                            <tr>
+                                <td class="p-3.5 text-cyan-400" colspan="4">TOTAL NATIONWIDE ADDRESSABLE SOFTWARE ARR</td>
+                                <td class="p-3.5 text-right text-emerald-400 mono-val text-sm">$246.8M USD</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Deep Dive Industry Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- Card 1 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="sun" class="w-4 h-4 text-cyan-400"></i>
+                            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wide">Utility Solar & Storage</h4>
+                        </div>
+                        <div class="text-[11px] text-cyan-300 mb-2 font-medium">
+                            <strong>Physics:</strong> Eliminates catastrophic core runaway caused by mid-day thermal heat soaking combined with high grid ripple harmonics.
+                        </div>
+                        <p class="text-[11px] text-gray-400">
+                            <strong>Why Others Missed This:</strong> Incumbents oversize magnetic inductors by 300% or rely on sacrificial fans that fail in desert installations, wasting millions in copper mass.
+                        </p>
+                    </div>
+                    <span class="text-[10px] mono-val text-gray-500 mt-3 block pt-2 border-t border-gray-800">$77.7M Target Sector ARR</span>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="car" class="w-4 h-4 text-violet-400"></i>
+                            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wide">Electric Vehicles (800V OBC)</h4>
+                        </div>
+                        <div class="text-[11px] text-violet-300 mb-2 font-medium">
+                            <strong>Physics:</strong> Prevents premature saturation during high-power bidirectional V2G DC fast charging under extreme winter/summer battery conditions.
+                        </div>
+                        <p class="text-[11px] text-gray-400">
+                            <strong>Why Others Missed This:</strong> Legacy Tier 1 suppliers use external thermistors that lag core internal temperature by up to 14 seconds—far too late to catch microsecond saturation spikes.
+                        </p>
+                    </div>
+                    <span class="text-[10px] mono-val text-gray-500 mt-3 block pt-2 border-t border-gray-800">$63.7M Target Sector ARR</span>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="satellite" class="w-4 h-4 text-amber-400"></i>
+                            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wide">Commercial Satellites</h4>
+                        </div>
+                        <div class="text-[11px] text-amber-300 mb-2 font-medium">
+                            <strong>Physics:</strong> Identifies radiation-induced defect pinning in orbit before thermal runaway detonates the main power bus.
+                        </div>
+                        <p class="text-[11px] text-gray-400">
+                            <strong>Why Others Missed This:</strong> Satellite operators rely on basic telemetry overcurrent trips that only trigger after GaN power switches have already suffered short-circuit breakdown.
+                        </p>
+                    </div>
+                    <span class="text-[10px] mono-val text-gray-500 mt-3 block pt-2 border-t border-gray-800">$40.8M Target Sector ARR</span>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="activity" class="w-4 h-4 text-emerald-400"></i>
+                            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wide">Medical MRI Systems</h4>
+                        </div>
+                        <div class="text-[11px] text-emerald-300 mb-2 font-medium">
+                            <strong>Physics:</strong> Real-time $\oint B\,d\Phi$ observation preserves gradient amplifier linearity during rapid multi-slice echo-planar imaging.
+                        </div>
+                        <p class="text-[11px] text-gray-400">
+                            <strong>Why Others Missed This:</strong> Medical manufacturers use heavy liquid chiller jackets instead of high-frequency dynamic firmware modulation.
+                        </p>
+                    </div>
+                    <span class="text-[10px] mono-val text-gray-500 mt-3 block pt-2 border-t border-gray-800">$34.2M Target Sector ARR</span>
+                </div>
+
+                <!-- Card 5 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="server" class="w-4 h-4 text-rose-400"></i>
+                            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wide">AI Data Centers (48V PoL)</h4>
+                        </div>
+                        <div class="text-[11px] text-rose-300 mb-2 font-medium">
+                            <strong>Physics:</strong> Dynamically adjusts phase interleaving during massive GPU load transients to halt core heating in ultra-miniaturized planar inductors.
+                        </div>
+                        <p class="text-[11px] text-gray-400">
+                            <strong>Why Others Missed This:</strong> Server vendors throttle GPU clock cycles rather than preserving power stage magnetic efficiency.
+                        </p>
+                    </div>
+                    <span class="text-[10px] mono-val text-gray-500 mt-3 block pt-2 border-t border-gray-800">$18.9M Target Sector ARR</span>
+                </div>
+
+                <!-- Card 6 -->
+                <div class="bg-space-900/60 border border-gray-800 rounded-xl p-4 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <i data-lucide="plane" class="w-4 h-4 text-blue-400"></i>
+                            <h4 class="text-xs font-bold text-gray-200 uppercase tracking-wide">Electric Aviation (eVTOL)</h4>
+                        </div>
+                        <div class="text-[11px] text-blue-300 mb-2 font-medium">
+                            <strong>Physics:</strong> Guaranteed magnetic safety margins without the weight penalty of triple-redundant magnetic cores during takeoff thrust.
+                        </div>
+                        <p class="text-[11px] text-gray-400">
+                            <strong>Why Others Missed This:</strong> Aerospace engineers design for 100% passive thermal margins, robbing eVTOL payloads of up to 45 kg of battery mass.
+                        </p>
+                    </div>
+                    <span class="text-[10px] mono-val text-gray-500 mt-3 block pt-2 border-t border-gray-800">$11.5M Target Sector ARR</span>
+                </div>
+            </div>
+
+            <!-- Collaboration Call to Action Banner -->
+            <div class="p-6 rounded-xl bg-space-950 border border-cyan-500/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-base font-bold text-white">License the CoreLoss Real-Time Firmware Kernel</h3>
+                    <p class="text-xs text-gray-400 mt-0.5">Integrates into any TI C2000, Microchip dsPIC, or AMD/Xilinx FPGA power converter controller.</p>
+                </div>
+                <a href="mailto:support@rfwavecode.com" class="px-5 py-2.5 rounded-lg bg-cyan-500 text-black font-bold text-xs hover:bg-cyan-400 transition-all flex items-center space-x-2 shadow-lg shadow-cyan-500/20">
+                    <i data-lucide="mail" class="w-4 h-4"></i>
+                    <span>Contact Enterprise Licensing (support@rfwavecode.com)</span>
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-800/80 bg-space-950/80 py-4 text-xs text-gray-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+                CoreLoss™ Hysteresis Sentry | NASA STTR Topic Z2.01 | In Partnership with UCF CATER Labs
+            </div>
+            <div class="mono-val text-[11px]">
+                Direct Contact: <a href="mailto:support@rfwavecode.com" class="text-cyan-400 hover:underline">support@rfwavecode.com</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Application Logic & Simulation Engine -->
+    <script>
+        // Lucide Icons initialization
+        lucide.createIcons();
+
+        // ----------------------------------------------------
+        // Tab Switching Engine (Explicit dictionary mapping)
+        // ----------------------------------------------------
+        const tabMapping = {
+            'sim': { viewId: 'viewSim', btnId: 'tabBtnSim' },
+            'physics': { viewId: 'viewPhysics', btnId: 'tabBtnPhysics' },
+            'proposal': { viewId: 'viewProposal', btnId: 'tabBtnProposal' },
+            'arr': { viewId: 'viewARR', btnId: 'tabBtnARR' }
+        };
+
+        function switchTab(activeKey) {
+            Object.keys(tabMapping).forEach(key => {
+                const view = document.getElementById(tabMapping[key].viewId);
+                const btn = document.getElementById(tabMapping[key].btnId);
+                if (key === activeKey) {
+                    view.classList.remove('hidden');
+                    btn.className = "px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
+                } else {
+                    view.classList.add('hidden');
+                    btn.className = "px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 border border-transparent";
+                }
+            });
+
+            // Retrigger MathJax Typeset on tab switch so formulas are always rendered cleanly
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise();
+            }
+
+            // Resize canvas if returning to simulation view
+            if (activeKey === 'sim') {
+                setTimeout(() => {
+                    resizeCanvas();
+                }, 50);
+            }
+        }
+
+        // ----------------------------------------------------
+        // State Model & Physics Variables
+        // ----------------------------------------------------
+        const state = {
+            sepFlux: 0.0,            // 0 - 100 arbitrary flux
+            ambientTemp: 25.0,        // -40 to 140 °C
+            coreTemp: 48.2,           // Calculated dynamic temperature
+            dissipationArea: 14.22,   // mJ / cycle
+            switchingFreq: 350.0,     // kHz
+            autonomousEnabled: true,
+            isMitigating: false,
+            phaseAngle: 0.0,
+            coercivityHc: 1.25,       // A/m
+            saturationBsat: 1.28,     // Tesla
+            loopDataPoints: []
+        };
+
+        // DOM Element References
+        const sliderSep = document.getElementById('sliderSep');
+        const sliderTemp = document.getElementById('sliderTemp');
+        const toggleAutonomous = document.getElementById('toggleAutonomous');
+        const labelSepFlux = document.getElementById('labelSepFlux');
+        const labelAmbientTemp = document.getElementById('labelAmbientTemp');
+        const navCoreDiss = document.getElementById('navCoreDiss');
+        const navTopology = document.getElementById('navTopology');
+        const navSepFlux = document.getElementById('navSepFlux');
+        const toroidTemp = document.getElementById('toroidTemp');
+        const loopAreaVal = document.getElementById('loopAreaVal');
+        const chart1Val = document.getElementById('chart1Val');
+        const chart2Val = document.getElementById('chart2Val');
+        const statusBanner = document.getElementById('statusBanner');
+        const statusIconHolder = document.getElementById('statusIconHolder');
+        const statusTitle = document.getElementById('statusTitle');
+        const statusDesc = document.getElementById('statusDesc');
+        const mitigationBadge = document.getElementById('mitigationBadge');
+        const autoActionStatus = document.getElementById('autoActionStatus');
+        const valHc = document.getElementById('valHc');
+        const valBsat = document.getElementById('valBsat');
+        const valMode = document.getElementById('valMode');
+        const canvasModePill = document.getElementById('canvasModePill');
+
+        // Inputs
+        sliderSep.addEventListener('input', (e) => {
+            state.sepFlux = parseFloat(e.target.value);
+            labelSepFlux.innerText = `${state.sepFlux.toFixed(1)} MeV·cm⁻²`;
+            navSepFlux.innerText = `${state.sepFlux.toFixed(1)} MeV·cm⁻²`;
+        });
+
+        sliderTemp.addEventListener('input', (e) => {
+            state.ambientTemp = parseFloat(e.target.value);
+            labelAmbientTemp.innerText = `${state.ambientTemp.toFixed(1)} °C`;
+        });
+
+        toggleAutonomous.addEventListener('change', (e) => {
+            state.autonomousEnabled = e.target.checked;
+        });
+
+        function triggerSEPBump() {
+            sliderSep.value = 85;
+            state.sepFlux = 85;
+            labelSepFlux.innerText = "85.0 MeV·cm⁻²";
+            navSepFlux.innerText = "85.0 MeV·cm⁻²";
+        }
+
+        function resetDefaults() {
+            sliderSep.value = 0;
+            sliderTemp.value = 25;
+            state.sepFlux = 0.0;
+            state.ambientTemp = 25.0;
+            labelSepFlux.innerText = "0.0 MeV·cm⁻²";
+            labelAmbientTemp.innerText = "25.0 °C";
+            navSepFlux.innerText = "0.0 MeV·cm⁻²";
+        }
+
+        // ----------------------------------------------------
+        // Chart.js Setup: Primary Phase-Space & Telemetry
+        // ----------------------------------------------------
+        const ctxPhase = document.getElementById('phaseChart').getContext('2d');
+        const ctxDiss = document.getElementById('dissipationChart').getContext('2d');
+        const ctxFreq = document.getElementById('frequencyChart').getContext('2d');
+
+        // Generate static reference curves
+        function generateReferenceLoop(widthFactor, heightFactor) {
+            const pts = [];
+            const steps = 40;
+            for (let i = 0; i <= steps; i++) {
+                const theta = (i / steps) * 2 * Math.PI;
+                // Modified parametric loop for B vs Phi
+                const phi = heightFactor * Math.sin(theta);
+                const b = widthFactor * Math.cos(theta) + (0.35 * Math.sin(theta) * Math.sin(theta) * Math.sign(Math.cos(theta)));
+                pts.push({ x: parseFloat(b.toFixed(3)), y: parseFloat(phi.toFixed(3)) });
+            }
+            return pts;
+        }
+
+        const baselineNominalPts = generateReferenceLoop(0.45, 0.50);
+        const hazardLimitPts = generateReferenceLoop(0.85, 0.95);
+
+        // 1. Phase Chart (B vs Phi)
+        const phaseChart = new Chart(ctxPhase, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        label: 'Safe Nominal Baseline',
+                        data: baselineNominalPts,
+                        showLine: true,
+                        borderColor: 'rgba(52, 211, 153, 0.6)',
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        fill: false,
+                        borderDash: [4, 4]
+                    },
+                    {
+                        label: 'Thermal Runaway Hazard Threshold',
+                        data: hazardLimitPts,
+                        showLine: true,
+                        borderColor: 'rgba(239, 68, 68, 0.7)',
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                        fill: true,
+                        borderDash: [6, 4]
+                    },
+                    {
+                        label: 'Live Dynamic Hysteresis Trajectory',
+                        data: [],
+                        showLine: true,
+                        borderColor: '#22d3ee',
+                        borderWidth: 2.5,
+                        pointRadius: 2,
+                        pointBackgroundColor: '#67e8f9',
+                        fill: false
+                    },
+                    {
+                        label: 'Active Operating Point Head',
+                        data: [{ x: 0, y: 0 }],
+                        pointRadius: 6,
+                        pointBackgroundColor: '#06b6d4',
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Magnetic Flux Density B (Tesla [T])',
+                            color: '#94a3b8',
+                            font: { family: 'JetBrains Mono', size: 10 }
+                        },
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } },
+                        min: -1.2,
+                        max: 1.2
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Magnetic Flux Linkage Φ (µWb)',
+                            color: '#94a3b8',
+                            font: { family: 'JetBrains Mono', size: 10 }
+                        },
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } },
+                        min: -1.4,
+                        max: 1.4
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `B: ${ctx.parsed.x} T, Φ: ${ctx.parsed.y} µWb`
+                        }
+                    }
+                }
+            }
+        });
+
+        // 2. Secondary Chart 1: Dissipation
+        const historyLen = 25;
+        const timeLabels = Array.from({ length: historyLen }, (_, i) => `-${(historyLen - 1 - i) * 20}ms`);
+        const dissipationData = Array(historyLen).fill(14.2);
+        const dissipationThreshold = Array(historyLen).fill(28.0);
+
+        const dissChart = new Chart(ctxDiss, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [
+                    {
+                        label: 'Runaway Limit',
+                        data: dissipationThreshold,
+                        borderColor: 'rgba(239, 68, 68, 0.8)',
+                        borderWidth: 1.5,
+                        borderDash: [4, 4],
+                        pointRadius: 0,
+                        fill: false
+                    },
+                    {
+                        label: 'Real-time Loss (mJ)',
+                        data: dissipationData,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: { display: false },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } },
+                        min: 0,
+                        max: 45
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // 3. Secondary Chart 2: Frequency
+        const freqData = Array(historyLen).fill(350);
+        const freqChart = new Chart(ctxFreq, {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [
+                    {
+                        label: 'Switching Freq (kHz)',
+                        data: freqData,
+                        borderColor: '#22d3ee',
+                        backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: { display: false },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } },
+                        min: 80,
+                        max: 400
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // ----------------------------------------------------
+        // Canvas Drawing Engine: High-DPI Toroid Inductor
+        // ----------------------------------------------------
+        const canvas = document.getElementById('inductorCanvas');
+        const ctx = canvas.getContext('2d');
+        let canvasW = 400;
+        let canvasH = 300;
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvasW = rect.width || 400;
+            canvasH = rect.height || 300;
+            canvas.width = canvasW * dpr;
+            canvas.height = canvasH * dpr;
+            ctx.scale(dpr, dpr);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let animStepCount = 0;
+
+        function drawInductorCanvas() {
+            ctx.clearRect(0, 0, canvasW, canvasH);
+            const cx = canvasW / 2;
+            const cy = canvasH / 2;
+            const outerR = Math.min(canvasW, canvasH) * 0.38;
+            const innerR = outerR * 0.58;
+
+            // 1. Draw Magnetic Toroid Body with radiation/heat color shifting
+            const heatRatio = Math.min(1.0, Math.max(0, (state.coreTemp - 30) / 90));
+            // Color interpolation: dark slate (normal) -> deep red/orange (hot/irradiated)
+            const rVal = Math.floor(15 + 180 * heatRatio);
+            const gVal = Math.floor(23 + 40 * (1 - heatRatio));
+            const bVal = Math.floor(42 * (1 - heatRatio));
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, outerR, 0, 2 * Math.PI);
+            ctx.arc(cx, cy, innerR, 0, 2 * Math.PI, true);
+            ctx.closePath();
+
+            const toroidGrad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+            toroidGrad.addColorStop(0, `rgb(${rVal}, ${gVal}, ${bVal})`);
+            toroidGrad.addColorStop(0.5, `rgb(${Math.min(255, rVal + 25)}, ${Math.min(255, gVal + 25)}, ${bVal + 10})`);
+            toroidGrad.addColorStop(1, `rgb(${Math.max(5, rVal - 10)}, ${Math.max(5, gVal - 10)}, ${bVal})`);
+            ctx.fillStyle = toroidGrad;
+            ctx.fill();
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = state.isMitigating ? '#06b6d4' : (heatRatio > 0.6 ? '#ef4444' : '#334155');
+            ctx.stroke();
+            ctx.restore();
+
+            // 2. Dynamic Magnetic Flux Domain Lines inside the toroid
+            ctx.save();
+            const fluxLines = 8;
+            for (let f = 0; f < fluxLines; f++) {
+                const radius = innerR + ((outerR - innerR) / (fluxLines + 1)) * (f + 1);
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+                ctx.setLineDash([4, 12]);
+                ctx.lineDashOffset = -animStepCount * (state.switchingFreq / 90);
+                ctx.lineWidth = 1.2;
+                ctx.strokeStyle = heatRatio > 0.6 ? 'rgba(239, 68, 68, 0.4)' : 'rgba(34, 211, 238, 0.4)';
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // 3. Copper Windings wrapped around the toroid
+            const turns = 18;
+            for (let t = 0; t < turns; t++) {
+                const angle = (t / turns) * 2 * Math.PI;
+                const cosA = Math.cos(angle);
+                const sinA = Math.sin(angle);
+
+                const xIn = cx + innerR * cosA;
+                const yIn = cy + innerR * sinA;
+                const xOut = cx + outerR * cosA;
+                const yOut = cy + outerR * sinA;
+
+                // Winding turn
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(xIn, yIn);
+                ctx.lineTo(xOut, yOut);
+                ctx.lineWidth = 5.5;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = '#b45309'; // Copper
+                ctx.stroke();
+
+                // Copper sheen highlight
+                ctx.beginPath();
+                ctx.moveTo(xIn, yIn);
+                ctx.lineTo(xOut, yOut);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#fef08a';
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 4. Digital Sentry Pickoff Sensor Coil (Cyan Highlight Winding)
+            const sentryAngle = Math.PI * 0.25;
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(cx + innerR * Math.cos(sentryAngle), cy + innerR * Math.sin(sentryAngle));
+            ctx.lineTo(cx + outerR * Math.cos(sentryAngle), cy + outerR * Math.sin(sentryAngle));
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#22d3ee';
+            ctx.shadowColor = '#06b6d4';
+            ctx.shadowBlur = 10;
+            ctx.stroke();
+
+            // Secondary pickoff lines exiting to the DSP
+            ctx.beginPath();
+            ctx.moveTo(cx + outerR * Math.cos(sentryAngle), cy + outerR * Math.sin(sentryAngle));
+            ctx.lineTo(canvasW - 25, canvasH - 25);
+            ctx.setLineDash([2, 4]);
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#06b6d4';
+            ctx.stroke();
+            ctx.restore();
+
+            // 5. Radiation Incident Particles (if SEP active)
+            if (state.sepFlux > 5) {
+                const particleCount = Math.floor(state.sepFlux / 7);
+                ctx.save();
+                for (let p = 0; p < particleCount; p++) {
+                    const px = (animStepCount * 8 + p * 67) % canvasW;
+                    const py = (animStepCount * 5 + p * 89) % canvasH;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 2, 0, 2 * Math.PI);
+                    ctx.fillStyle = '#f43f5e';
+                    ctx.shadowColor = '#e11d48';
+                    ctx.shadowBlur = 6;
+                    ctx.fill();
+
+                    // Proton track tail
+                    ctx.beginPath();
+                    ctx.moveTo(px, py);
+                    ctx.lineTo(px - 14, py - 9);
+                    ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        // ----------------------------------------------------
+        // Dynamic Physics & Closed-Loop Controller Loop
+        // ----------------------------------------------------
+        function stepPhysics() {
+            animStepCount++;
+
+            // Physical degradation constants
+            const radPinningFactor = 1.0 + (state.sepFlux * 0.024); // Radiation widens loop up to ~3.4x
+            const ambientFactor = 1.0 + Math.max(0, (state.ambientTemp - 25) * 0.007);
+
+            // Coercivity expands with radiation defects
+            state.coercivityHc = 1.25 * radPinningFactor;
+            // Saturation Bsat drops with core temperature
+            state.saturationBsat = Math.max(0.75, 1.28 * (1.0 - (state.coreTemp / 570)));
+
+            valHc.innerText = `${state.coercivityHc.toFixed(2)} A/m`;
+            valBsat.innerText = `${state.saturationBsat.toFixed(2)} T`;
+
+            // Unmitigated potential dissipation loop area (mJ)
+            const rawDissipation = 14.22 * radPinningFactor * ambientFactor * (state.switchingFreq / 350.0);
+
+            // Autonomous State Observer Threshold
+            const runawayLimitThreshold = 26.5; // mJ limit
+
+            if (state.autonomousEnabled && rawDissipation > runawayLimitThreshold) {
+                // SENTRY ENGAGES: Throttle switching frequency & switch to Quasi-Resonant (QR) soft switching
+                state.isMitigating = true;
+                // Target reduced frequency (e.g. 120 kHz - 180 kHz depending on severity)
+                const targetFreq = Math.max(120, 350 - (state.sepFlux * 2.3) - ((state.ambientTemp - 25) * 0.8));
+                state.switchingFreq += (targetFreq - state.switchingFreq) * 0.15; // Smooth slew
+
+                // Closed-loop mitigated dissipation area
+                state.dissipationArea = rawDissipation * (state.switchingFreq / 350.0) * 0.62; // soft switching reduction
+
+                // Thermal balance: dissipation warms core, but reduced frequency halts thermal runaway
+                const equilibriumTemp = state.ambientTemp + (state.dissipationArea * 1.85);
+                state.coreTemp += (equilibriumTemp - state.coreTemp) * 0.04;
+
+                // UI Updates
+                statusBanner.className = "p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-500/50 flex flex-wrap items-center justify-between gap-4";
+                statusIconHolder.className = "w-8 h-8 rounded-full bg-cyan-500/10 border border-cyan-500/40 flex items-center justify-center text-cyan-400";
+                statusIconHolder.innerHTML = '<i data-lucide="zap" class="w-4 h-4"></i>';
+                statusTitle.innerText = "Autonomous Sentry Active: Core Degradation Throttled";
+                statusDesc.innerText = "Switching frequency reduced to preserve magnetic saturation margin. GaN inverter in ZVS Quasi-Resonant mode.";
+                mitigationBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700 mono-val font-semibold uppercase animate-pulse";
+                mitigationBadge.innerText = "QUASI-RESONANT ZVS";
+                navTopology.innerText = `QR ZVS (${Math.round(state.switchingFreq)} kHz)`;
+                navTopology.className = "text-cyan-400 font-semibold uppercase";
+                valMode.innerText = "QUASI-RES ZVS";
+                valMode.className = "font-bold text-cyan-400 mt-0.5";
+                canvasModePill.innerText = `QR ZVS ${Math.round(state.switchingFreq)} kHz`;
+                canvasModePill.className = "text-cyan-300";
+                autoActionStatus.innerText = "ACTIVE: FREQ SLEW & ZVS";
+                autoActionStatus.className = "text-cyan-400 font-semibold";
+            } else if (!state.autonomousEnabled && rawDissipation > runawayLimitThreshold) {
+                // RUNAWAY CONDITION (Autonomous protection switched off)
+                state.isMitigating = false;
+                state.switchingFreq = 350.0;
+                state.dissipationArea = rawDissipation;
+                // Core thermal runaway diverges
+                state.coreTemp += 0.45;
+
+                statusBanner.className = "p-3.5 rounded-xl bg-rose-950/60 border border-rose-500/80 flex flex-wrap items-center justify-between gap-4";
+                statusIconHolder.className = "w-8 h-8 rounded-full bg-rose-500/20 border border-rose-500 flex items-center justify-center text-rose-400";
+                statusIconHolder.innerHTML = '<i data-lucide="alert-triangle" class="w-4 h-4"></i>';
+                statusTitle.innerText = "CRITICAL WARNING: Magnetic Core Thermal Runaway in Progress!";
+                statusDesc.innerText = "Hysteresis loop area exceeds dissipation limit. Bsat collapse imminent. GaN FET burnout risk.";
+                mitigationBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700 mono-val font-semibold uppercase animate-bounce";
+                mitigationBadge.innerText = "THERMAL RUNAWAY";
+                navTopology.innerText = "HARD PWM (UNSAFE)";
+                navTopology.className = "text-rose-400 font-semibold uppercase";
+                valMode.innerText = "PWM RUNAWAY";
+                valMode.className = "font-bold text-rose-400 mt-0.5";
+                canvasModePill.innerText = "PWM 350 kHz (RUNAWAY)";
+                canvasModePill.className = "text-rose-400";
+                autoActionStatus.innerText = "ALERT: MARGIN EXCEEDED";
+                autoActionStatus.className = "text-rose-400 font-semibold";
+            } else {
+                // NOMINAL SAFE REGIME
+                state.isMitigating = false;
+                state.switchingFreq = 350.0;
+                state.dissipationArea = rawDissipation;
+                const equilibriumTemp = state.ambientTemp + (state.dissipationArea * 1.55);
+                state.coreTemp += (equilibriumTemp - state.coreTemp) * 0.05;
+
+                statusBanner.className = "p-3.5 rounded-xl bg-gray-900/60 border border-gray-800 flex flex-wrap items-center justify-between gap-4";
+                statusIconHolder.className = "w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400";
+                statusIconHolder.innerHTML = '<i data-lucide="shield-check" class="w-4 h-4"></i>';
+                statusTitle.innerText = "Nanocrystalline Core Operating Within Radiation-Hardened Margin";
+                statusDesc.innerText = "Dynamic B-Φ hysteresis loop area is baseline. No thermal runaway detected.";
+                mitigationBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 mono-val font-semibold uppercase";
+                mitigationBadge.innerText = "NOMINAL (PWM)";
+                navTopology.innerText = "Hard PWM (350 kHz)";
+                navTopology.className = "text-emerald-400 font-semibold uppercase";
+                valMode.innerText = "HARD PWM";
+                valMode.className = "font-bold text-gray-200 mt-0.5";
+                canvasModePill.innerText = "PWM 350 kHz";
+                canvasModePill.className = "text-cyan-300";
+                autoActionStatus.innerText = "STANDBY (SAFE MARGIN)";
+                autoActionStatus.className = "text-emerald-400 font-semibold";
+            }
+
+            // Real-time loop trace generation for the phase scatter plot
+            const loopScaleW = 0.45 * Math.sqrt(state.dissipationArea / 14.22);
+            const loopScaleH = 0.50 * Math.sqrt(state.dissipationArea / 14.22);
+
+            const dynamicLoopPts = [];
+            const ptsCount = 36;
+            for (let i = 0; i <= ptsCount; i++) {
+                const theta = (i / ptsCount) * 2 * Math.PI;
+                const phi = loopScaleH * Math.sin(theta);
+                const b = loopScaleW * Math.cos(theta) + (0.32 * Math.sin(theta) * Math.sin(theta) * Math.sign(Math.cos(theta)));
+                dynamicLoopPts.push({ x: parseFloat(b.toFixed(3)), y: parseFloat(phi.toFixed(3)) });
+            }
+            state.loopDataPoints = dynamicLoopPts;
+
+            // Compute current rotating head position
+            state.phaseAngle += 0.28 * (state.switchingFreq / 350.0);
+            const headPhi = loopScaleH * Math.sin(state.phaseAngle);
+            const headB = loopScaleW * Math.cos(state.phaseAngle) + (0.32 * Math.sin(state.phaseAngle) * Math.sin(state.phaseAngle) * Math.sign(Math.cos(state.phaseAngle)));
+
+            // Numerical displays
+            navCoreDiss.innerText = `${state.dissipationArea.toFixed(1)} mJ/cyc`;
+            loopAreaVal.innerText = `${state.dissipationArea.toFixed(2)} mJ`;
+            chart1Val.innerText = `${state.dissipationArea.toFixed(1)} mJ`;
+            chart2Val.innerText = `${Math.round(state.switchingFreq)} kHz`;
+            toroidTemp.innerText = `Core: ${state.coreTemp.toFixed(1)} °C`;
+
+            // Draw Inductor Canvas
+            drawInductorCanvas();
+
+            // Refresh Phase Chart with live loop and glowing active head
+            phaseChart.data.datasets[2].data = state.loopDataPoints;
+            phaseChart.data.datasets[2].borderColor = state.isMitigating ? '#06b6d4' : (state.dissipationArea > 26 ? '#f43f5e' : '#22d3ee');
+            phaseChart.data.datasets[3].data = [{ x: parseFloat(headB.toFixed(3)), y: parseFloat(headPhi.toFixed(3)) }];
+            phaseChart.data.datasets[3].pointBackgroundColor = state.isMitigating ? '#06b6d4' : (state.dissipationArea > 26 ? '#ef4444' : '#67e8f9');
+            phaseChart.update('none');
+
+            // Throttled time-series update (every 4 ticks)
+            if (animStepCount % 4 === 0) {
+                dissipationData.shift();
+                dissipationData.push(parseFloat(state.dissipationArea.toFixed(2)));
+                dissChart.update('none');
+
+                freqData.shift();
+                freqData.push(Math.round(state.switchingFreq));
+                freqChart.update('none');
+            }
+        }
+
+        // Start Physics Engine Loop at 30 Hz
+        setInterval(stepPhysics, 33);
+
+        // Re-run icons on DOM ready
+        window.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise();
+            }
+        });
+    </script>
+</body>
+</html>
